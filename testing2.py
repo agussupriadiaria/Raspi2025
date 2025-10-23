@@ -11,7 +11,7 @@ Modified: 23 Oktober 2025
 Issue:
 > data di gui belum langsung update ketika barcode di scan
 > belum ada data temporary akumulasi scan barcode 
-
+Testing aja
 '''
 
 # Import library ================
