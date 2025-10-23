@@ -8,8 +8,11 @@ Direct send data scan to database
 Createde: 22 Oktober 2025
 Modified: 23 Oktober 2025
 
-'''
+Issue:
+> data di gui belum langsung update ketika barcode di scan
+> belum ada data temporary akumulasi scan barcode 
 
+'''
 
 # Import library ================
 from tkinter import *
@@ -140,12 +143,31 @@ def mainPage():
     updateDate()
     userIDNum()
 
+
+# --- NILAI SALDO UNTUK SETIAP BARCODE ---
+barcode_values = {
+    "8994096222069": 50,
+    "8991002100108": 100,
+    "1234567890123": 75
+}
+
 # --- FUNGSI KIRIM WEBHOOK + UPDATE LABEL BARCODE ---
 def send_webhook(barcode_data):
-    # tampilkan ke GUI
-    barcodeLabel.config(text=barcode_data)
+    global saldo
+
+    value = barcode_values.get(barcode_data)
+
+    # --- Tampilkan status ke GUI ---
+    if value is None:
+        barcodeLabel.config(text="UNKNOWN")
+        nominalLabel.config(text="0")
+        add_barcode_to_list("WEBHOOK", f"⚠️ Barcode tidak dikenal: {barcode_data}")
+    else:
+        barcodeLabel.config(text=barcode_data)
+        nominalLabel.config(text=value)
     root.update_idletasks()
 
+    # --- Kirim webhook ke server (tetap dikirim meski unknown) ---
     payload = {
         "barcode": barcode_data,
         "secret_key": SECRET_KEY
@@ -155,6 +177,12 @@ def send_webhook(barcode_data):
         response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
         if response.status_code == 200:
             add_barcode_to_list("WEBHOOK", f"✅ Kirim sukses: {barcode_data}")
+
+            # Tambah saldo hanya kalau barcode valid
+            if value is not None:
+                bottleCounter()
+                saldo += value
+                parameterLabel3.config(text=saldo)
         else:
             add_barcode_to_list("WEBHOOK", f"❌ Gagal ({response.status_code})")
     except Exception as e:
@@ -184,6 +212,7 @@ def barcode_listener():
         add_barcode_to_list("SYSTEM", "⚠️ Izin ditolak (jalankan pakai sudo)")
     except Exception as e:
         add_barcode_to_list("SYSTEM", f"⚠️ Error: {e}")
+
 
 def userIDNum():
     global userID
