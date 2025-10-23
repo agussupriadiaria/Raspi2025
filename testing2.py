@@ -72,6 +72,10 @@ signal.signal(signal.SIGINT, signal_handler)
 def add_barcode_to_list(source, message):
     print(f"[{source}] {message}")
 
+# --- DEFINISI VARIABLE BOTTLE DAN SALDO ---
+bottle = 0
+saldo = 0
+
 # --- GUI UTAMA ---
 def mainPage():
     global root, timeStamp, dateStamp, barcodeLabel, jumlahLabel, ukuranLabel, nominalLabel
@@ -136,9 +140,6 @@ def mainPage():
     Label(mainFrame, text="Terima Kasih Sudah Ikut", font=("Helvetica", 10, "bold"),bg="white").place(x=457, y=300)
     Label(mainFrame, text="Menyelamatkan Lingkungan", font=("Helvetica", 10, "bold"),bg="white").place(x=445, y=325)
 
-    bottle = 0
-    saldo = 0
-
     updateTime()
     updateDate()
     userIDNum()
@@ -146,30 +147,35 @@ def mainPage():
 
 # --- NILAI SALDO UNTUK SETIAP BARCODE ---
 barcode_values = {
-    "8994096222069": 50,
-    "8991002100108": 100,
-    "1234567890123": 75
+    "8994096222069": {"value": 50, "size": "Small"},
+    "8991002100108": {"value": 100, "size": "Big"},
+    "1234567890123": {"value": 75, "size": "Medium"}
 }
 
 # --- FUNGSI KIRIM WEBHOOK + UPDATE LABEL BARCODE ---
 def send_webhook(barcode_data):
-    global saldo
+    global saldo, bottle
 
-    value = barcode_values.get(barcode_data)
+    item = barcode_values.get(barcode_data)
 
-    # --- Tampilkan status ke GUI ---
-    if value is None:
+    if item is None:
         barcodeLabel.config(text="UNKNOWN")
         nominalLabel.config(text="0")
+        ukuranLabel.config(text="-")
         add_barcode_to_list("WEBHOOK", f"⚠️ Barcode tidak dikenal: {barcode_data}")
     else:
+        value = item["value"]
+        size = item["size"]
         barcodeLabel.config(text=barcode_data)
         nominalLabel.config(text=value)
+        ukuranLabel.config(text=size)
     root.update_idletasks()
 
-    # --- Kirim webhook ke server (tetap dikirim meski unknown) ---
+    # --- Kirim webhook ---
     payload = {
         "barcode": barcode_data,
+        "nominal": item["value"] if item else 0,
+        "ukuran": item["size"] if item else "UNKNOWN",
         "secret_key": SECRET_KEY
     }
 
@@ -177,11 +183,9 @@ def send_webhook(barcode_data):
         response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
         if response.status_code == 200:
             add_barcode_to_list("WEBHOOK", f"✅ Kirim sukses: {barcode_data}")
-
-            # Tambah saldo hanya kalau barcode valid
-            if value is not None:
+            if item is not None:
                 bottleCounter()
-                saldo += value
+                saldo += item["value"]
                 parameterLabel3.config(text=saldo)
         else:
             add_barcode_to_list("WEBHOOK", f"❌ Gagal ({response.status_code})")
@@ -231,7 +235,7 @@ def resetCounter():
     bottle = 0
     saldo = 0
     parameterLabel3["text"] = saldo
-    nominalLabel["text"] = saldo
+    nominalLabel["text"] = "0"
     jumlahLabel["text"] = bottle
     ukuranLabel["text"] = "-"
     barcodeLabel["text"] = "0"
@@ -252,6 +256,7 @@ def thermalPrinterX():
         add_barcode_to_list("PRINTER", "🖨️ Struk berhasil dicetak.")
     except Exception as e:
         add_barcode_to_list("PRINTER", f"⚠️ Gagal print: {e}")
+        return
 
 def updateTime():
     hours = time.strftime("%H")
@@ -280,6 +285,8 @@ def pinOutArduino():
     gp.output(19, gp.HIGH)
 
 def inSensor():
+    if not root.winfo_exists():
+        return
     if gp.input(26) == gp.LOW:
         time.sleep(3)
         add_barcode_to_list("SENSOR", "Bottle In")
