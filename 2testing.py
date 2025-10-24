@@ -1,6 +1,20 @@
-# =============================================
-# ATM SAMPAH - PILAH SAMPAH (Versi QR + Back)
-# =============================================
+'''
+ATM SAMPAH V5
+System: barcode scanner > raspi > webhook > database
+
+Perpose:
+Direct send data scan to database
+
+Feature:
+- inject data dari barcode scanner ke db langsung
+- ada QR hasil transaksi yang bisa discan dan mengarahkan ke page input transaction
+
+Createde: 22 Oktober 2025
+Modified: 23 Oktober 2025
+
+Issue:
+- Flow QR belum sesuai dengan ekspektasi
+'''
 
 from tkinter import *
 import random
