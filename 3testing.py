@@ -102,12 +102,12 @@ def send_webhook(barcode_data):
         nominalLabel.config(text=str(item["value"]))
         barcodeLabel.config(text=barcode_data)
     else:
-        barcodeLabel.config(text="UNKNOWN")
+        barcodeLabel.config(text="unregistered")
 
     payload = {
         "barcode": barcode_data,
         "nominal": item["value"] if item else 0,
-        "ukuran": item["size"] if item else "UNKNOWN",
+        "ukuran": item["size"] if item else "unregistered",
         "secret_key": SECRET_KEY
     }
     try:
