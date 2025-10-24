@@ -31,10 +31,14 @@ import os
 import sys
 import signal
 
-# --- KONFIGURASI UMUM ---
+# --- KONFIGURASI BARCODE ---
 DEVICE_PATH = '/dev/input/event4'
+
+# --- KONFIGURASI WEBHOOK ---
 WEBHOOK_URL = 'https://pilahsampahsaja.duckdns.org/barcode/webhook1.php'
 SECRET_KEY = "GantiDenganKunciSuperRahasiaAnda123!"
+
+# --- KONFIGURASI BARCODE FINAL ---
 WORDPRESS_URL = "https://pilahsampahsaja.duckdns.org/"  # ganti dgn situs WordPress kamu
 
 # --- GPIO SETUP ---
