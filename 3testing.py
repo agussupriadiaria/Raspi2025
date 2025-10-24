@@ -21,7 +21,7 @@ import signal
 DEVICE_PATH = '/dev/input/event4'
 WEBHOOK_URL = 'https://pilahsampahsaja.duckdns.org/barcode/webhook1.php'
 SECRET_KEY = "GantiDenganKunciSuperRahasiaAnda123!"
-WORDPRESS_URL = "https://websitekamu.com/"  # ganti dgn situs WordPress kamu
+WORDPRESS_URL = "https://pilahsampahsaja.duckdns.org/"  # ganti dgn situs WordPress kamu
 
 # --- GPIO SETUP ---
 gp.setwarnings(False)
@@ -39,7 +39,7 @@ gp.output(19, gp.HIGH)
 root = None
 bottle = 0
 saldo = 0
-userID = 0
+trxID = 0
 
 # --- PEMETAAN KEYBOARD BARCODE ---
 key_mapping = {
@@ -57,7 +57,7 @@ barcode_values = {
 
 # --- CETAK STRUK ---
 def thermalPrinterX():
-    global bottle, saldo, userID
+    global bottle, saldo, trxID
     try:
         p = Serial(devfile='/dev/serial0', baudrate=9600, bytesize=8, parity='N',
                    stopbits=1, timeout=1.00, dsrdtr=True)
@@ -65,7 +65,7 @@ def thermalPrinterX():
         p.text("ATM SAMPAH\nPilah Sampah\n\n")
         p.text(f"Jumlah Botol: {bottle} pcs\n")
         p.text(f"Total Saldo: Rp {saldo}\n\n")
-        p.text(f"User ID: {userID}\n")
+        p.text(f"Trx ID: {trxID}\n")
         p.text(datetime.now().strftime("%d-%m-%Y %H:%M") + "\n")
         p.text("Terima kasih\n\n\n")
     except Exception as e:
@@ -115,12 +115,12 @@ def barcode_listener():
 
 # --- HALAMAN QR CODE ---
 def showQRCodePage():
-    global userID
+    global trxID
     for widget in root.winfo_children():
         widget.destroy()
 
     root.config(bg="white")
-    qr_url = f"{WORDPRESS_URL}?userid={userID}"
+    qr_url = f"{WORDPRESS_URL}?trxid={trxID}"
     qr = qrcode.make(qr_url)
     qr.save("/tmp/qr.png")
 
@@ -129,7 +129,7 @@ def showQRCodePage():
 
     Label(root, text="Scan QR Code ini", font=("Helvetica", 16, "bold"), bg="white").pack(pady=20)
     Label(root, image=qr_img, bg="white").pack(pady=10)
-    Label(root, text=f"User ID: {userID}", font=("Helvetica", 12), bg="white").pack(pady=10)
+    Label(root, text=f"Trx ID: {trxID}", font=("Helvetica", 12), bg="white").pack(pady=10)
     Label(root, text="Arahkan kamera HP Anda ke QR ini", font=("Helvetica", 10), bg="white").pack(pady=10)
 
     Button(root, text="⬅ Kembali", font=("Helvetica", 12, "bold"),
@@ -139,14 +139,14 @@ def showQRCodePage():
 
 # --- RESET DAN CETAK STRUK ---
 def resetCounter():
-    global saldo, bottle, userID
+    global saldo, bottle, trxID
     thermalPrinterX()
     showQRCodePage()
 
 # --- HALAMAN UTAMA ---
 def mainPage():
-    global root, parameterLabel3, jumlahLabel, ukuranLabel, nominalLabel, barcodeLabel, userIDLabel
-    global saldo, bottle, userID
+    global root, parameterLabel3, jumlahLabel, ukuranLabel, nominalLabel, barcodeLabel, trxIDLabel
+    global saldo, bottle, trxID
 
     for widget in root.winfo_children():
         widget.destroy()
@@ -175,14 +175,14 @@ def mainPage():
     transaksiFrame.place(x=370, y=75)
 
     Label(transaksiFrame, text="DATA", font=("Helvetica",15,"bold"), bg="white").place(x=135, y=10)
-    Label(transaksiFrame, text="User ID", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=50)
+    Label(transaksiFrame, text="Trx ID", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=50)
     Label(transaksiFrame, text="Jumlah", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=75)
     Label(transaksiFrame, text="Ukuran", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=100)
     Label(transaksiFrame, text="Nominal Rp", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=125)
     Label(transaksiFrame, text="Barcode", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=150)
 
-    userIDLabel = Label(transaksiFrame, text=str(userID), font=("Helvetica",10,"bold"), bg="white")
-    userIDLabel.place(x=170, y=50)
+    trxIDLabel = Label(transaksiFrame, text=str(trxID), font=("Helvetica",10,"bold"), bg="white")
+    trxIDLabel.place(x=170, y=50)
     jumlahLabel = Label(transaksiFrame, text=str(bottle), font=("Helvetica",10,"bold"), bg="white")
     jumlahLabel.place(x=170, y=75)
     ukuranLabel = Label(transaksiFrame, text="-", font=("Helvetica",10,"bold"), bg="white")
@@ -197,8 +197,8 @@ def mainPage():
     Button(mainFrame, text="Scan Ulang", font=("Helvetica",10,"bold"),
            bg="yellow", fg="black", width=10, height=3, command=barcodeScanner).place(x=195, y=290)
 
-    userID = random.randrange(10000, 99999)
-    userIDLabel.config(text=str(userID))
+    trxID = random.randrange(10000, 99999)
+    trxIDLabel.config(text=str(trxID))
 
 def barcodeScanner():
     gp.output(13, gp.LOW)
