@@ -80,9 +80,10 @@ key_mapping = {
 
 # --- DATA BARCODE SEDERHANA ---
 barcode_values = {
-    "8994096222069": {"value": 50, "size": "Small"},
-    "8991002100108": {"value": 100, "size": "Big"},
-    "1234567890123": {"value": 75, "size": "Medium"}
+    "8994096222069": {"value": 50, "size": "Small"}, #cuttonbud
+    "4902430874267": {"value": 50, "size": "Small"}, #gilete
+    "8997022362389": {"value": 75, "size": "Medium"}, #masker
+    "8999999540159": {"value": 100, "size": "Big"} #vaseline
 }
 
 # --- CETAK STRUK ---
@@ -243,7 +244,10 @@ def mainPage():
     Button(mainFrame, text="Scan Ulang", font=("Helvetica",10,"bold"),
            bg="yellow", fg="black", width=10, height=3, command=barcodeScanner).place(x=195, y=290)
 
-    trxID = random.randrange(10000, 99999)
+# --- RANDOM TRX ID ---
+    #trxID = random.randrange(10000, 99999)
+    import string
+    trxID = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     trxIDLabel.config(text=str(trxID))
 
 # --- GPIO UNTUK MENJALANKAN ULANG BARCODE SCANNER ---
