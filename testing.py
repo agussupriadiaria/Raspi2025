@@ -1,39 +1,67 @@
 '''
 ATM SAMPAH V5
+TESTING
 System: barcode scanner > raspi > webhook > database
 
 Perpose:
 Direct send data scan to database
 
+Feature:
+- inject data dari barcode scanner ke db langsung
+- ada QR hasil transaksi yang bisa discan dan mengarahkan ke page input transaction
+
 Createde: 22 Oktober 2025
 Modified: 23 Oktober 2025
 
 Issue:
-> data di gui belum langsung update ketika barcode di scan
-> belum ada data temporary akumulasi scan barcode 
-
+- Flow QR belum sesuai dengan ekspektasi
 '''
 
-# Import library ================
 from tkinter import *
-import serial.tools.list_ports
-import threading
+import random
 import time
+import qrcode
+from PIL import Image, ImageTk
+import RPi.GPIO as gp
+from datetime import datetime
+from escpos.printer import Serial
+import requests
+import threading
+from evdev import InputDevice, ecodes
+import os
 import sys
 import signal
-import RPi.GPIO as gp
-import random
-import os
-import requests
-from evdev import InputDevice, ecodes
-from escpos.printer import Serial
-from datetime import datetime
 
-# --- PENGATURAN ---
+# --- KONFIGURASI BARCODE ---
 DEVICE_PATH = '/dev/input/event4'
-WEBHOOK_URL = 'https://pilahsampahsaja.duckdns.org/barcode/webhook.php'
+
+# --- KONFIGURASI WEBHOOK ---
+WEBHOOK_URL = 'https://pilahsampahsaja.duckdns.org/barcode/webhook1.php'
+WEBHOOK_URL2 = 'https://pilahsampahsaja.duckdns.org/barcode/webhook2.php'
 SECRET_KEY = "GantiDenganKunciSuperRahasiaAnda123!"
 
+# --- KONFIGURASI BARCODE FINAL ---
+WORDPRESS_URL = "https://pilahsampahsaja.duckdns.org/"  # ganti dgn situs WordPress kamu
+
+# --- GPIO SETUP ---
+gp.setwarnings(False)
+gp.setmode(gp.BCM)
+gp.setup(5, gp.OUT)
+gp.setup(6, gp.IN, pull_up_down=gp.PUD_UP)
+gp.setup(13, gp.OUT)
+gp.setup(19, gp.OUT)
+gp.setup(26, gp.IN, pull_up_down=gp.PUD_UP)
+gp.output(5, gp.HIGH)
+gp.output(13, gp.HIGH)
+gp.output(19, gp.HIGH)
+
+# --- VARIABEL GLOBAL ---
+root = None
+bottle = 0
+saldo = 0
+trxID = 0
+
+# --- PEMETAAN KEYBOARD BARCODE ---
 key_mapping = {
     ecodes.KEY_0: '0', ecodes.KEY_1: '1', ecodes.KEY_2: '2',
     ecodes.KEY_3: '3', ecodes.KEY_4: '4', ecodes.KEY_5: '5',
@@ -50,266 +78,207 @@ key_mapping = {
     ecodes.KEY_ENTER: 'ENTER', ecodes.KEY_KPENTER: 'ENTER'
 }
 
-nomor = 1  # variabel nomor urut
+# --- DATA BARCODE SEDERHANA ---
+barcode_values = {
+    "8994096222069": {"value": 50, "size": "Small"},
+    "8991002100108": {"value": 100, "size": "Big"},
+    "1234567890123": {"value": 75, "size": "Medium"}
+}
 
-# Set GPIO pin =====================
-gp.setwarnings(False)
-gp.setmode(gp.BCM)
-gp.setup(5, gp.OUT)
-gp.output(5, gp.HIGH)
-gp.setup(6, gp.IN, pull_up_down=gp.PUD_UP)
-gp.setup(13, gp.OUT)
-gp.output(13, gp.HIGH)
-gp.setup(19, gp.OUT)
-gp.output(19, gp.HIGH)
-gp.setup(26, gp.IN, pull_up_down=gp.PUD_UP)
+# --- CETAK STRUK ---
+def thermalPrinterX():
+    global bottle, saldo, trxID
+    try:
+        p = Serial(devfile='/dev/serial0', baudrate=9600, bytesize=8, parity='N',
+                   stopbits=1, timeout=1.00, dsrdtr=True)
+        p.set(font="a", height=1, align="center", bold=True)
+        p.text("ATM SAMPAH\nPilah Sampah\n\n")
+        p.text(f"Jumlah Botol: {bottle} pcs\n")
+        p.text(f"Total Saldo: Rp {saldo}\n\n")
+        p.text(f"Trx ID: {trxID}\n")
+        p.text(datetime.now().strftime("%d-%m-%Y %H:%M") + "\n")
+        p.text("Terima kasih\n\n\n")
+    except Exception as e:
+        print("Gagal print:", e)
 
-def signal_handler(signum, frame):
-    sys.exit()
-signal.signal(signal.SIGINT, signal_handler)
+# --- FUNGSI SCAN BARCODE ---
+def send_webhook(barcode_data):
+    global saldo, bottle
+    item = barcode_values.get(barcode_data)
+    if item:
+        saldo += item["value"]
+        bottle += 1
+        parameterLabel3.config(text=str(saldo))
+        jumlahLabel.config(text=str(bottle))
+        ukuranLabel.config(text=item["size"])
+        nominalLabel.config(text=str(item["value"]))
+        barcodeLabel.config(text=barcode_data)
+    else:
+        barcodeLabel.config(text="unregistered")
 
-# --- FUNGSI LOG TERMINAL ---
-def add_barcode_to_list(source, message):
-    print(f"[{source}] {message}")
+    payload = {
+        "barcode": barcode_data,
+        "nominal": item["value"] if item else 0,
+        "ukuran": item["size"] if item else "unregistered",
+        "secret_key": SECRET_KEY
+    }
+    try:
+        requests.post(WEBHOOK_URL, json=payload, timeout=5)
+    except:
+        pass
 
-# --- DEFINISI VARIABLE BOTTLE DAN SALDO ---
-bottle = 0
-saldo = 0
+# --- FUNGSI SCAN BARCODE ---
+def send_webhook2():
+    global saldo, trxID
+    payload = {
+        "trxid": trxID,
+        "saldo": saldo,
+        "secret_key": SECRET_KEY
+    }
+    try:
+        requests.post(WEBHOOK_URL2, json=payload, timeout=5)
+    except:
+        pass
 
-# --- GUI UTAMA ---
-def mainPage():
-    global root, timeStamp, dateStamp, barcodeLabel, jumlahLabel, ukuranLabel, nominalLabel
-    global bottle, saldo, parameterLabel3, userIDLabel
 
-    root = Tk()
-    root.geometry("800x500")
-    root.title("Atm Sampah - PilahSampah")
+# --- DETECT BARCODE SCANNER ---
+def barcode_listener():
+    if not os.path.exists(DEVICE_PATH):
+        print("Scanner tidak ditemukan.")
+        return
+    dev = InputDevice(DEVICE_PATH)
+    current_barcode = ""
+    for event in dev.read_loop():
+        if event.type == ecodes.EV_KEY and event.value == 1:
+            key_code = event.code
+            if key_code in [ecodes.KEY_ENTER, ecodes.KEY_KPENTER]:
+                if current_barcode:
+                    send_webhook(current_barcode)
+                    current_barcode = ""
+            elif key_code in key_mapping:
+                current_barcode += key_mapping[key_code]
+
+# --- HALAMAN QR CODE ---
+def showQRCodePage():
+    global trxID
+    for widget in root.winfo_children():
+        widget.destroy()
+
     root.config(bg="white")
+    qr_url = f"{WORDPRESS_URL}?trxid={trxID}"
+    qr = qrcode.make(qr_url)
+    qr.save("/tmp/qr.png")
 
-    titleLabel = Label(root, text="PilahSampah", font=("Helvetica",18, "bold"), bg="white")
-    titleLabel.place(relx=0.5, rely=0.1,anchor=CENTER)
+    img = Image.open("/tmp/qr.png").resize((250, 250))
+    qr_img = ImageTk.PhotoImage(img)
+
+    Label(root, text="Scan QR Code ini", font=("Helvetica", 16, "bold"), bg="white").pack(pady=20)
+    Label(root, image=qr_img, bg="white").pack(pady=10)
+    Label(root, text=f"Trx ID: {trxID}", font=("Helvetica", 12), bg="white").pack(pady=10)
+    Label(root, text="Arahkan kamera HP Anda ke QR ini", font=("Helvetica", 10), bg="white").pack(pady=10)
+
+    Button(root, text="⬅ Kembali", font=("Helvetica", 12, "bold"),
+           bg="lightblue", width=12, height=2, command=reloadMainPage).pack(pady=25)
+
+    root.qr_img = qr_img  # simpan agar tidak hilang dari memori
+
+# --- RESET DAN CETAK STRUK ---
+def resetCounter():
+    global saldo, bottle, trxID
+    thermalPrinterX()
+    send_webhook2()
+    showQRCodePage()
+
+# --- HALAMAN UTAMA ---
+def mainPage():
+    global root, parameterLabel3, jumlahLabel, ukuranLabel, nominalLabel, barcodeLabel, trxIDLabel
+    global saldo, bottle, trxID
+
+    for widget in root.winfo_children():
+        widget.destroy()
+
+    root.config(bg="white")
+    root.geometry("800x500")
+    root.title("ATM Sampah - PilahSampah")
+
+    titleLabel = Label(root, text="PilahSampah", font=("Helvetica",18,"bold"), bg="white")
+    titleLabel.place(relx=0.5, rely=0.1, anchor=CENTER)
 
     mainFrame = Frame(root, bg="white", bd=10, highlightbackground="green", highlightthickness=5)
     mainFrame.place(relx=0.025, rely=0.15, relwidth=0.95, relheight=0.80)
 
-    stampFrame = Frame (mainFrame,bg="white",width=400, height=100)
-    stampFrame.place(x=10, y=10)
-
-    Label(stampFrame, text="Waktu   ", font=("Helvetica",10, "bold"), bg="white").place(x=10, y=1)
-    Label(stampFrame, text="Tanggal ", font=("Helvetica",10, "bold"), bg="white").place(x=10, y=30)
-
-    timeStamp = Label(stampFrame, text="00:00:00",font=("Helvetica",10, "bold"), bg="white")
-    timeStamp.place(x=100, y=1)
-    dateStamp = Label(stampFrame, text="dd/mm/yy",font=("Helvetica",10, "bold"), bg="white")
-    dateStamp.place(x=100, y=30)
-
-    Label(mainFrame, text="[PilahSampah - Malang]", font=("Courier",10, "bold"), bg="white").place(x=540, y=10)
-
-    parameterFrame = Frame(mainFrame, bg="white",width=350, height=200, highlightbackground="blue", highlightthickness=5 )
+    parameterFrame = Frame(mainFrame, bg="white", width=350, height=200,
+                            highlightbackground="blue", highlightthickness=5)
     parameterFrame.place(x=10, y=75)
 
-    Label(parameterFrame,bg="white", text="TOTAL SALDO", font=("Helvetica", 15, "bold")).place(x=85, y=10)
-    Label(parameterFrame, text="Rp", font=("Helvetica", 30, "bold"), bg="white").place(x=65, y=80)
-    parameterLabel3 = Label(parameterFrame, text="9999", font=("Helvetica", 30, "bold"), bg="white")
+    Label(parameterFrame, text="TOTAL SALDO", font=("Helvetica",15,"bold"), bg="white").place(x=85, y=10)
+    Label(parameterFrame, text="Rp", font=("Helvetica",30,"bold"), bg="white").place(x=65, y=80)
+    parameterLabel3 = Label(parameterFrame, text=str(saldo), font=("Helvetica",30,"bold"), bg="white")
     parameterLabel3.place(x=140, y=80)
 
-    transaksiFrame = Frame(mainFrame, bg="white",width=350, height=200, highlightbackground="red", highlightthickness=5 )
+    transaksiFrame = Frame(mainFrame, bg="white", width=350, height=200,
+                            highlightbackground="red", highlightthickness=5)
     transaksiFrame.place(x=370, y=75)
 
-    Label(transaksiFrame, bg="white", text="DATA", font=("Helvetica", 15, "bold")).place(x=135, y=10)
-    Label(transaksiFrame, bg="white", text="TID   ", font=("Helvetica", 10, "bold")).place(x=50, y=50)
-    Label(transaksiFrame, bg="white", text="Jumlah    ", font=("Helvetica", 10, "bold")).place(x=50, y=75)
-    Label(transaksiFrame, bg="white", text="Ukuran   ", font=("Helvetica", 10, "bold")).place(x=50, y=100)
-    Label(transaksiFrame, bg="white", text="Nominal            Rp", font=("Helvetica", 10, "bold")).place(x=50, y=125)
-    Label(transaksiFrame, bg="white", text="Barcode  ", font=("Helvetica", 10, "bold")).place(x=50, y=150)
+    Label(transaksiFrame, text="DATA", font=("Helvetica",15,"bold"), bg="white").place(x=135, y=10)
+    Label(transaksiFrame, text="Trx ID", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=50)
+    Label(transaksiFrame, text="Jumlah", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=75)
+    Label(transaksiFrame, text="Ukuran", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=100)
+    Label(transaksiFrame, text="Nominal Rp", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=125)
+    Label(transaksiFrame, text="Barcode", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=150)
 
-    userIDLabel = Label(transaksiFrame, bg="white", text="99999", font=("Helvetica", 10, "bold"))
-    userIDLabel.place(x=170, y=50)
-    jumlahLabel = Label(transaksiFrame, bg="white", text="999", font=("Helvetica", 10, "bold"))
+    trxIDLabel = Label(transaksiFrame, text=str(trxID), font=("Helvetica",10,"bold"), bg="white")
+    trxIDLabel.place(x=170, y=50)
+    jumlahLabel = Label(transaksiFrame, text=str(bottle), font=("Helvetica",10,"bold"), bg="white")
     jumlahLabel.place(x=170, y=75)
-    ukuranLabel = Label(transaksiFrame, bg="white", text="Medium", font=("Helvetica", 10, "bold"))
+    ukuranLabel = Label(transaksiFrame, text="-", font=("Helvetica",10,"bold"), bg="white")
     ukuranLabel.place(x=170, y=100)
-    nominalLabel = Label(transaksiFrame, bg="white", text="999", font=("Helvetica", 10, "bold"))
+    nominalLabel = Label(transaksiFrame, text="0", font=("Helvetica",10,"bold"), bg="white")
     nominalLabel.place(x=210, y=125)
-    barcodeLabel = Label(transaksiFrame, bg="white", text="9999999999999", font=("Helvetica", 10, "bold"))
+    barcodeLabel = Label(transaksiFrame, text="-", font=("Helvetica",10,"bold"), bg="white")
     barcodeLabel.place(x=170, y=150)
 
-    Button(mainFrame,text="Cetak Struk", font=("Helvetica",10, "bold"), bg="green",fg = "blue", width=10, height=3, command=resetCounter).place(x=55, y=290)
-    Button(mainFrame,text="Scan Ulang", font=("Helvetica",10, "bold"), bg="yellow",fg = "blue", width=10, height=3, command=barcodeScanner).place(x=195, y=290)
+    Button(mainFrame, text="Cetak Struk", font=("Helvetica",10,"bold"),
+           bg="green", fg="white", width=10, height=3, command=resetCounter).place(x=55, y=290)
+    Button(mainFrame, text="Scan Ulang", font=("Helvetica",10,"bold"),
+           bg="yellow", fg="black", width=10, height=3, command=barcodeScanner).place(x=195, y=290)
 
-    Label(mainFrame, text="Terima Kasih Sudah Ikut", font=("Helvetica", 10, "bold"),bg="white").place(x=457, y=300)
-    Label(mainFrame, text="Menyelamatkan Lingkungan", font=("Helvetica", 10, "bold"),bg="white").place(x=445, y=325)
+    trxID = random.randrange(10000, 99999)
+    trxIDLabel.config(text=str(trxID))
 
-    updateTime()
-    updateDate()
-    userIDNum()
-
-
-# --- NILAI SALDO UNTUK SETIAP BARCODE ---
-barcode_values = {
-    "8994096222069": 50,
-    "8991002100108": 100,
-    "1234567890123": 75
-}
-
-# --- FUNGSI KIRIM WEBHOOK + UPDATE LABEL BARCODE ---
-def send_webhook(barcode_data):
-    global saldo, bottle
-
-    value = barcode_values.get(barcode_data)
-
-    # --- Tampilkan status ke GUI ---
-    if value is None:
-        barcodeLabel.config(text="UNKNOWN")
-        nominalLabel.config(text="0")
-        add_barcode_to_list("WEBHOOK", f"⚠️ Barcode tidak dikenal: {barcode_data}")
-    else:
-        barcodeLabel.config(text=barcode_data)
-        nominalLabel.config(text=value)
-    root.update_idletasks()
-
-    # --- Kirim webhook ke server (tetap dikirim meski unknown) ---
-    payload = {
-        "barcode": barcode_data,
-        "secret_key": SECRET_KEY
-    }
-
-    try:
-        response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
-        if response.status_code == 200:
-            add_barcode_to_list("WEBHOOK", f"✅ Kirim sukses: {barcode_data}")
-
-            # Tambah saldo hanya kalau barcode valid
-            if value is not None:
-                bottleCounter()
-                saldo += value
-                parameterLabel3.config(text=saldo)
-        else:
-            add_barcode_to_list("WEBHOOK", f"❌ Gagal ({response.status_code})")
-    except Exception as e:
-        add_barcode_to_list("WEBHOOK", f"⚠️ Error koneksi: {e}")
-
-# --- LOOP PEMINDAI BARCODE ---
-def barcode_listener():
-    if not os.path.exists(DEVICE_PATH):
-        add_barcode_to_list("SYSTEM", f"❌ Device tidak ditemukan di {DEVICE_PATH}")
-        return
-
-    try:
-        dev = InputDevice(DEVICE_PATH)
-        add_barcode_to_list("SYSTEM", f"Scanner aktif: {dev.name}")
-
-        current_barcode = ""
-        for event in dev.read_loop():
-            if event.type == ecodes.EV_KEY and event.value == 1:
-                key_code = event.code
-                if key_code in [ecodes.KEY_ENTER, ecodes.KEY_KPENTER]:
-                    if current_barcode:
-                        send_webhook(current_barcode)
-                        current_barcode = ""
-                elif key_code in key_mapping:
-                    current_barcode += key_mapping[key_code]
-    except PermissionError:
-        add_barcode_to_list("SYSTEM", "⚠️ Izin ditolak (jalankan pakai sudo)")
-    except Exception as e:
-        add_barcode_to_list("SYSTEM", f"⚠️ Error: {e}")
-
-
-def userIDNum():
-    global userID
-    userID = random.randrange(10000, 100000)
-    userIDLabel["text"] = userID
-
-def bottleCounter():
-    global bottle
-    bottle += 1
-    parameterLabel3["text"] = saldo
-    jumlahLabel["text"] = bottle
-
-def resetCounter():
-    global bottle, saldo
-    thermalPrinterX()
-    bottle = 0
-    saldo = 0
-    parameterLabel3["text"] = saldo
-    nominalLabel["text"] = "0"
-    jumlahLabel["text"] = bottle
-    ukuranLabel["text"] = "-"
-    barcodeLabel["text"] = "0"
-    userIDNum()
-    add_barcode_to_list("RESET", "Data direset ke awal.")
-
-def thermalPrinterX():
-    try:
-        p = Serial(devfile='/dev/serial0', baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=1.00, dsrdtr=True)
-        p.set(font="a", height=1, align="center", bold=True, double_height=False)
-        p.text("ATM SAMPAH\nPilah Sampah\n\n")
-        p.text(f"Jumlah Botol: {bottle} Pcs\n")
-        p.text(f"Total Saldo: Rp {saldo}\n\n")
-        p.text(f"User ID: {userID}\n")
-        current_date = datetime.now().strftime("%d-%m-%Y")
-        p.text(current_date + "\n")
-        p.text("Terima kasih\n\n\n")
-        add_barcode_to_list("PRINTER", "🖨️ Struk berhasil dicetak.")
-    except Exception as e:
-        add_barcode_to_list("PRINTER", f"⚠️ Gagal print: {e}")
-        return
-
-def updateTime():
-    hours = time.strftime("%H")
-    minutes = time.strftime("%M")
-    seconds = time.strftime("%S")
-    timeStamp.config(text=f"{hours}:{minutes}:{seconds}")
-    timeStamp.after(1000, updateTime)
-
-def updateDate():
-    tanggal = time.strftime("%d")
-    bulan = time.strftime("%m")
-    tahun = time.strftime("%Y")
-    dateStamp.config(text=f"{tanggal}-{bulan}-{tahun}")
-    dateStamp.after(86400000, updateDate)
-
+# --- GPIO UNTUK MENJALANKAN ULANG BARCODE SCANNER ---
 def barcodeScanner():
-    add_barcode_to_list("SCANNER", "Barcode On")
     gp.output(13, gp.LOW)
-    time.sleep(4)
+    time.sleep(2)
     gp.output(13, gp.HIGH)
 
-def pinOutArduino():
-    add_barcode_to_list("ARDUINO", "Pin aktif LOW -> HIGH")
-    gp.output(19, gp.LOW)
-    time.sleep(2)
-    gp.output(19, gp.HIGH)
+# --- RESET VARIABLE ---
+def reloadMainPage():
+    global saldo, bottle
+    saldo = 0
+    bottle = 0
+    mainPage()
 
-def inSensor():
-    if not root.winfo_exists():
-        return
-    if gp.input(26) == gp.LOW:
-        time.sleep(3)
-        add_barcode_to_list("SENSOR", "Bottle In")
-        barcodeScanner()
-    root.after(50, inSensor)
-
-def fullSensor():
-    if gp.input(6) == gp.LOW:
-        gp.output(5, gp.HIGH)
-    else:
-        gp.output(5, gp.LOW)
-    root.after(50, fullSensor)
-
+# --- CLEANUP DATA WHEN APP CLOSED ---
 def closeWindow():
-    global root, serialData
-    serialData = False
     gp.cleanup()
-    root.destroy()
-
-# --- THREAD PEMINDAI BARCODE ---
-t = threading.Thread(target=barcode_listener, daemon=True)
-t.start()
+    try:
+        root.destroy()
+    except:
+        pass
 
 # --- MAIN PROGRAM ---
-mainPage()
-root.after(50, inSensor)
-root.after(50, fullSensor)
-root.protocol("WM_DELETE_WINDOW", closeWindow)
-root.mainloop()
+def main():
+    global root
+    signal.signal(signal.SIGINT, lambda s, f: sys.exit())
+    root = Tk()
+    mainPage()
+
+    t = threading.Thread(target=barcode_listener, daemon=True)
+    t.start()
+
+    root.protocol("WM_DELETE_WINDOW", closeWindow)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
