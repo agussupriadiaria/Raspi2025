@@ -103,61 +103,6 @@ def thermalPrinterX():
     except Exception as e:
         print("Gagal print:", e)
 
-# --- FUNGSI SCAN BARCODE ---
-
-'''
-def send_webhook(barcode_data):
-    global saldo, bottle
-    item = barcode_values.get(barcode_data)
-    if item:
-        saldo += item["value"]
-        bottle += 1
-        parameterLabel3.config(text=str(saldo))
-        jumlahLabel.config(text=str(bottle))
-        ukuranLabel.config(text=item["size"])
-        nominalLabel.config(text=str(item["value"]))
-        barcodeLabel.config(text=barcode_data)
-        print("barcodenya:", barcode_data)
-        print("trxID: ", trxID)
-        print("saldo: ", saldo)
-        print("bottle: ", bottle)
-    else:
-        barcodeLabel.config(text="unregistered")
-
-    payload = {
-        "barcode": barcode_data,
-        "ukuran": item["size"] if item else "unregistered",
-        "nominal": item["value"] if item else 0,
-        "secret_key": SECRET_KEY
-    }
-    try:
-        r = requests.post(WEBHOOK_URL, json=payload, timeout=5)
-        print("→ Status:", r.status_code)
-        print("→ Response:", r.text)
-    except Exception as e:
-        print("🚨 Error request:", e)
-'''
-'''
-    try:
-        requests.post(WEBHOOK_URL, json=payload, timeout=5)
-        print("data payload: ", payload)
-    except:
-        pass
-        '''
-'''
-# --- FUNGSI SCAN BARCODE ---
-def send_webhook2():
-    global saldo, trxID
-    payload = {
-        "trxid": trxID,
-        "saldo": saldo,
-        "secret_key": SECRET_KEY
-    }
-    try:
-        requests.post(WEBHOOK_URL2, json=payload, timeout=5)
-    except:
-        pass
-'''
 # --- FUNGSI SCAN BARCODE (Perbaikan Logging) ---
 def send_webhook(barcode_data):
     global saldo, bottle
@@ -224,35 +169,17 @@ def barcode_listener():
             elif key_code in key_mapping:
                 current_barcode += key_mapping[key_code]
 
-
 # --- HALAMAN QR CODE ---
 def showQRCodePage():
     global root, trxID, saldo, bottle
     for widget in root.winfo_children():
         widget.destroy()
 
-    root.config(bg="white")
-# --- INPUT PARAMETER URL HERE ---
-    qr_url = f"{WORDPRESS_URL}transactions/?number={trxID}&date={datetime.now().strftime('%Y-%m-%d')}"
-    qr = qrcode.make(qr_url)
-    qr.save("/tmp/qr.png")
-    img = Image.open("/tmp/qr.png").resize((250, 250))
-    qr_img = ImageTk.PhotoImage(img)
-
-    Label(root, text="Scan QR Code ini", font=("Helvetica", 16, "bold"), bg="white").pack(pady=20)
-    Label(root, image=qr_img, bg="white").pack(pady=10)
-    Label(root, text=f"Trx ID: {trxID}", font=("Helvetica", 12), bg="white").pack(pady=10)
-    Label(root, text="Arahkan kamera HP Anda ke QR ini", font=("Helvetica", 10), bg="white").pack(pady=10)
-
-    Button(root, text="⬅ Kembali", font=("Helvetica", 12, "bold"), bg="lightblue", width=12, height=2, command=reloadMainPage).pack(pady=25)
-    root.qr_img = qr_img  # simpan agar tidak hilang dari memori
-
-'''
+# --- SHOW BARCODE TO SCAN IN PHONE ---
 def showQRCodePage():
     global root, trxID, saldo, bottle
     for widget in root.winfo_children():
         widget.destroy()
-
     root.config(bg="white")
 
     # --- INPUT PARAMETER URL HERE ---
@@ -277,7 +204,7 @@ def showQRCodePage():
     ).pack(pady=25)
 
     root.qr_img = qr_img  # simpan agar tidak hilang dari memori
-'''
+
 # --- RESET DAN CETAK STRUK ---
 def resetCounter():
     global saldo, bottle, trxID
