@@ -80,11 +80,9 @@ key_mapping = {
 
 # --- DATA BARCODE SEDERHANA ---
 barcode_values = {
-    "8994096222069": {"value": 50, "size": "Small"}, #cuttonbud
-    "4902430874267": {"value": 50, "size": "Small"}, #gilete
-    "8997022362389": {"value": 75, "size": "Medium"}, #masker
-    "8999999540159": {"value": 100, "size": "Big"} #vaseline
-    # contoh unregistered: 8996001600269 le minarale
+    "8994096222069": {"value": 50, "size": "Small"},
+    "8991002100108": {"value": 100, "size": "Big"},
+    "1234567890123": {"value": 75, "size": "Medium"}
 }
 
 # --- CETAK STRUK ---
@@ -104,8 +102,6 @@ def thermalPrinterX():
         print("Gagal print:", e)
 
 # --- FUNGSI SCAN BARCODE ---
-
-'''
 def send_webhook(barcode_data):
     global saldo, bottle
     item = barcode_values.get(barcode_data)
@@ -117,34 +113,20 @@ def send_webhook(barcode_data):
         ukuranLabel.config(text=item["size"])
         nominalLabel.config(text=str(item["value"]))
         barcodeLabel.config(text=barcode_data)
-        print("barcodenya:", barcode_data)
-        print("trxID: ", trxID)
-        print("saldo: ", saldo)
-        print("bottle: ", bottle)
     else:
         barcodeLabel.config(text="unregistered")
 
     payload = {
         "barcode": barcode_data,
-        "ukuran": item["size"] if item else "unregistered",
         "nominal": item["value"] if item else 0,
+        "ukuran": item["size"] if item else "unregistered",
         "secret_key": SECRET_KEY
     }
     try:
-        r = requests.post(WEBHOOK_URL, json=payload, timeout=5)
-        print("→ Status:", r.status_code)
-        print("→ Response:", r.text)
-    except Exception as e:
-        print("🚨 Error request:", e)
-'''
-'''
-    try:
         requests.post(WEBHOOK_URL, json=payload, timeout=5)
-        print("data payload: ", payload)
     except:
         pass
-        '''
-'''
+
 # --- FUNGSI SCAN BARCODE ---
 def send_webhook2():
     global saldo, trxID
@@ -157,55 +139,7 @@ def send_webhook2():
         requests.post(WEBHOOK_URL2, json=payload, timeout=5)
     except:
         pass
-'''
-# --- FUNGSI SCAN BARCODE (Perbaikan Logging) ---
-def send_webhook(barcode_data):
-    global saldo, bottle
-    item = barcode_values.get(barcode_data)
-    if item:
-        saldo += item["value"]
-        bottle += 1
-        parameterLabel3.config(text=str(saldo))
-        jumlahLabel.config(text=str(bottle))
-        ukuranLabel.config(text=item["size"])
-        nominalLabel.config(text=str(item["value"]))
-        barcodeLabel.config(text=barcode_data)
-        print("barcodenya:", barcode_data)
-        print("trxID: ", trxID)
-        print("saldo: ", saldo)
-        print("bottle: ", bottle)
-    else:
-        barcodeLabel.config(text="unregistered")
 
-    payload = {
-        "barcode": barcode_data,
-        "ukuran": item["size"] if item else "unregistered",
-        "nominal": item["value"] if item else 0,
-        "secret_key": SECRET_KEY
-    }
-    try:
-        import requests.exceptions # Pastikan import ini tersedia
-        r = requests.post(WEBHOOK_URL, json=payload, timeout=5)
-        print("→ Status (Webhook 1):", r.status_code)
-        print("→ Response (Webhook 1):", r.text)
-    except requests.exceptions.RequestException as e:
-        print("🚨 Error request (Webhook 1):", e)
-
-# --- FUNGSI FINAL TRANSACTION (Perbaikan Logging) ---
-def send_webhook2():
-    global saldo, trxID
-    payload = {
-        "trxid": trxID,
-        "saldo": saldo,
-        "secret_key": SECRET_KEY
-    }
-    try:
-        import requests.exceptions # Pastikan import ini tersedia
-        r = requests.post(WEBHOOK_URL2, json=payload, timeout=5)
-        print("→ Status (Webhook 2):", r.status_code)
-        print("→ Response (Webhook 2):", r.text)
-    except requests.exceptions.RequestException as e:
-        print("🚨 Error request (Webhook 2):", e)
 
 # --- DETECT BARCODE SCANNER ---
 def barcode_listener():
@@ -224,18 +158,17 @@ def barcode_listener():
             elif key_code in key_mapping:
                 current_barcode += key_mapping[key_code]
 
-
 # --- HALAMAN QR CODE ---
 def showQRCodePage():
-    global root, trxID, saldo, bottle
+    global trxID
     for widget in root.winfo_children():
         widget.destroy()
 
     root.config(bg="white")
-# --- INPUT PARAMETER URL HERE ---
-    qr_url = f"{WORDPRESS_URL}transactions/?number={trxID}&date={datetime.now().strftime('%Y-%m-%d')}"
+    qr_url = f"{WORDPRESS_URL}?trxid={trxID}"
     qr = qrcode.make(qr_url)
     qr.save("/tmp/qr.png")
+
     img = Image.open("/tmp/qr.png").resize((250, 250))
     qr_img = ImageTk.PhotoImage(img)
 
@@ -244,40 +177,11 @@ def showQRCodePage():
     Label(root, text=f"Trx ID: {trxID}", font=("Helvetica", 12), bg="white").pack(pady=10)
     Label(root, text="Arahkan kamera HP Anda ke QR ini", font=("Helvetica", 10), bg="white").pack(pady=10)
 
-    Button(root, text="⬅ Kembali", font=("Helvetica", 12, "bold"), bg="lightblue", width=12, height=2, command=reloadMainPage).pack(pady=25)
-    root.qr_img = qr_img  # simpan agar tidak hilang dari memori
-
-'''
-def showQRCodePage():
-    global root, trxID, saldo, bottle
-    for widget in root.winfo_children():
-        widget.destroy()
-
-    root.config(bg="white")
-
-    # --- INPUT PARAMETER URL HERE ---
-    try:
-        qr_url = f"{WORDPRESS_URL}transactions/?number={trxID}&date={datetime.now().strftime('%Y-%m-%d')}"
-        qr = qrcode.make(qr_url)
-        qr.save("/tmp/qr.png")
-        img = Image.open("/tmp/qr.png").resize((250, 250))
-        qr_img = ImageTk.PhotoImage(img)
-    except Exception as e:
-        print("Gagal membuat QR:", e)
-        return
-
-    Label(root, text="Scan QR Code ini", font=("Helvetica", 16, "bold"), bg="white").pack(pady=20)
-    Label(root, image=qr_img, bg="white").pack(pady=10)
-    Label(root, text=f"Trx ID: {trxID}", font=("Helvetica", 12), bg="white").pack(pady=10)
-    Label(root, text="Arahkan kamera HP Anda ke QR ini", font=("Helvetica", 10), bg="white").pack(pady=10)
-
-    Button(
-        root, text="⬅ Kembali", font=("Helvetica", 12, "bold"),
-        bg="lightblue", width=12, height=2, command=reloadMainPage
-    ).pack(pady=25)
+    Button(root, text="⬅ Kembali", font=("Helvetica", 12, "bold"),
+           bg="lightblue", width=12, height=2, command=reloadMainPage).pack(pady=25)
 
     root.qr_img = qr_img  # simpan agar tidak hilang dari memori
-'''
+
 # --- RESET DAN CETAK STRUK ---
 def resetCounter():
     global saldo, bottle, trxID
@@ -303,7 +207,8 @@ def mainPage():
     mainFrame = Frame(root, bg="white", bd=10, highlightbackground="green", highlightthickness=5)
     mainFrame.place(relx=0.025, rely=0.15, relwidth=0.95, relheight=0.80)
 
-    parameterFrame = Frame(mainFrame, bg="white", width=350, height=200,highlightbackground="blue", highlightthickness=5)
+    parameterFrame = Frame(mainFrame, bg="white", width=350, height=200,
+                            highlightbackground="blue", highlightthickness=5)
     parameterFrame.place(x=10, y=75)
 
     Label(parameterFrame, text="TOTAL SALDO", font=("Helvetica",15,"bold"), bg="white").place(x=85, y=10)
@@ -311,7 +216,8 @@ def mainPage():
     parameterLabel3 = Label(parameterFrame, text=str(saldo), font=("Helvetica",30,"bold"), bg="white")
     parameterLabel3.place(x=140, y=80)
 
-    transaksiFrame = Frame(mainFrame, bg="white", width=350, height=200, highlightbackground="red", highlightthickness=5)
+    transaksiFrame = Frame(mainFrame, bg="white", width=350, height=200,
+                            highlightbackground="red", highlightthickness=5)
     transaksiFrame.place(x=370, y=75)
 
     Label(transaksiFrame, text="DATA", font=("Helvetica",15,"bold"), bg="white").place(x=135, y=10)
@@ -332,17 +238,12 @@ def mainPage():
     barcodeLabel = Label(transaksiFrame, text="-", font=("Helvetica",10,"bold"), bg="white")
     barcodeLabel.place(x=170, y=150)
 
-    Button(mainFrame, text="Cetak Struk", font=("Helvetica",10,"bold"), bg="green", fg="white", width=10, height=3, command=resetCounter).place(x=55, y=290)
-    Button(mainFrame, text="Scan Ulang", font=("Helvetica",10,"bold"), bg="yellow", fg="black", width=10, height=3, command=barcodeScanner).place(x=195, y=290)
+    Button(mainFrame, text="Cetak Struk", font=("Helvetica",10,"bold"),
+           bg="green", fg="white", width=10, height=3, command=resetCounter).place(x=55, y=290)
+    Button(mainFrame, text="Scan Ulang", font=("Helvetica",10,"bold"),
+           bg="yellow", fg="black", width=10, height=3, command=barcodeScanner).place(x=195, y=290)
 
-# --- RANDOM TRX ID ---
-    #trxID = random.randrange(10000, 99999)
-    '''
-    import string
-    trxID = ''.join(random.choices(string.digits, k=14))
-    trxIDLabel.config(text=str(trxID))
-    '''
-    trxID = random.randint(10**13, 10**14 - 1)
+    trxID = random.randrange(10000, 99999)
     trxIDLabel.config(text=str(trxID))
 
 # --- GPIO UNTUK MENJALANKAN ULANG BARCODE SCANNER ---
