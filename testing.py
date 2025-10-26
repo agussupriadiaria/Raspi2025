@@ -215,13 +215,14 @@ def resetCounter():
 # --- HALAMAN UTAMA ---
 def mainPage():
     global root, parameterLabel3, jumlahLabel, ukuranLabel, nominalLabel, barcodeLabel, trxIDLabel
-    global saldo, bottle, trxID
+    global saldo, bottle, trxID, timeStamp, dateStamp
 
     for widget in root.winfo_children():
         widget.destroy()
 
     root.config(bg="white")
     root.geometry("800x500")
+    #root.attributes('-fullscreen',True)
     root.title("ATM Sampah - PilahSampah")
 
     titleLabel = Label(root, text="PilahSampah", font=("Helvetica",18,"bold"), bg="white")
@@ -230,11 +231,26 @@ def mainPage():
     mainFrame = Frame(root, bg="white", bd=10, highlightbackground="green", highlightthickness=5)
     mainFrame.place(relx=0.025, rely=0.15, relwidth=0.95, relheight=0.80)
 
+    stampFrame = Frame (mainFrame,bg="white",width=400, height=100)
+    stampFrame.place(x=10, y=10)
+
+    timeLabel = Label(stampFrame, text="Waktu   ", font=("Helvetica",10, "bold"), bg="white")
+    timeLabel.place(x=10, y=1)
+    dateLabel = Label(stampFrame, text="Tanggal ", font=("Helvetica",10, "bold"), bg="white")
+    dateLabel.place(x=10, y=30)
+
+    timeStamp = Label(stampFrame, text="00:00:00",font=("Helvetica",10, "bold"), bg="white")
+    timeStamp.place(x=100, y=1)
+    dateStamp = Label(stampFrame, text="dd/mm/yy",font=("Helvetica",10, "bold"), bg="white")
+    dateStamp.place(x=100, y=30)
+
+    ariaLabel = Label(mainFrame, text="[PilahSampah - Malang]", font=("Courier",10, "bold"), bg="white")
+    ariaLabel.place(x=540, y=10)
+
     parameterFrame = Frame(mainFrame, bg="white", width=350, height=200,highlightbackground="blue", highlightthickness=5)
     parameterFrame.place(x=10, y=75)
 
     Label(parameterFrame, text="TOTAL SALDO", font=("Helvetica",15,"bold"), bg="white").place(x=85, y=10)
-    Label(parameterFrame, text="Rp", font=("Helvetica",30,"bold"), bg="white").place(x=65, y=80)
     parameterLabel3 = Label(parameterFrame, text=str(saldo), font=("Helvetica",30,"bold"), bg="white")
     parameterLabel3.place(x=140, y=80)
 
@@ -245,7 +261,7 @@ def mainPage():
     Label(transaksiFrame, text="Trx ID", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=50)
     Label(transaksiFrame, text="Jumlah", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=75)
     Label(transaksiFrame, text="Ukuran", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=100)
-    Label(transaksiFrame, text="Nominal Rp", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=125)
+    Label(transaksiFrame, text="Poin", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=125)
     Label(transaksiFrame, text="Barcode", font=("Helvetica",10,"bold"), bg="white").place(x=50, y=150)
 
     trxIDLabel = Label(transaksiFrame, text=str(trxID), font=("Helvetica",10,"bold"), bg="white")
@@ -262,7 +278,7 @@ def mainPage():
     Button(mainFrame, text="Cetak Struk", font=("Helvetica",10,"bold"), bg="green", fg="white", width=10, height=3, command=resetCounter).place(x=55, y=290)
     Button(mainFrame, text="Scan Ulang", font=("Helvetica",10,"bold"), bg="yellow", fg="black", width=10, height=3, command=barcodeScanner).place(x=195, y=290)
 
-# --- RANDOM TRX ID ---
+    # --- RANDOM TRX ID ---
     #trxID = random.randrange(10000, 99999)
     '''
     import string
@@ -271,6 +287,31 @@ def mainPage():
     '''
     trxID = random.randint(10**13, 10**14 - 1)
     trxIDLabel.config(text=str(trxID))
+
+    # --- update date and time
+    updateTime()
+    updateDate()
+
+# Konfigurasi settingan format waktu
+def updateTime():
+    global time_text
+    hours = time.strftime("%H")
+    minutes = time.strftime("%M")
+    seconds = time.strftime("%S")
+    #am_or_pm = time.strftime("%p")
+    time_text = hours + ":" + minutes + ":" + seconds + " "
+    timeStamp.config(text= time_text)
+    timeStamp.after(1000, updateTime)
+
+# Konfigurasi format tanggal
+def updateDate():
+    global date_text
+    tanggal = time.strftime ("%d")
+    bulan = time.strftime ("%m")
+    tahun = time.strftime ("%Y")
+    date_text = tanggal + "-" + bulan + "-" + tahun
+    dateStamp.config(text= date_text)
+    dateStamp.after(86400000, updateDate)
 
 # --- GPIO UNTUK MENJALANKAN ULANG BARCODE SCANNER ---
 def barcodeScanner():
