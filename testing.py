@@ -166,7 +166,7 @@ def showQRCodePage():
         widget.destroy()
 
     root.config(bg="white")
-    qr_url = f"{WORDPRESS_URL}?trxid={trxID}"
+    qr_url = f"{WORDPRESS_URL}barcode-transaction/?input={trxID}"
     qr = qrcode.make(qr_url)
     qr.save("/tmp/qr.png")
 
